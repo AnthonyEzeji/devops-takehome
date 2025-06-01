@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  build:
+  build_and_test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -17,14 +17,16 @@ jobs:
         with:
           toolchain: stable
 
-      - name: Build & Test Rust Application
-        run: |
-          cd devops-takehome
-          cargo build --release
-          cargo test
+      - name: Build Rust Application
+        run: cargo build --release
+        working-directory: devops-takehome
 
-  deploy:
-    needs: build
+      - name: Run Tests
+        run: cargo test
+        working-directory: devops-takehome
+
+  docker_deploy:
+    needs: build_and_test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -33,15 +35,14 @@ jobs:
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-      - name: Build Docker Image
+      - name: Build and Push Docker Image
         run: |
-          cd devops-takehome
-          docker build -t anthonyezeji/rust-backend .
-
-      - name: Push Docker Image to Registry
-        run: docker push anthonyezeji/rust-backend:latest
+          docker build -t anthonyezeji/rust-backend:latest .
+          docker push anthonyezeji/rust-backend:latest
+        working-directory: devops-takehome
 
       - name: Deploy to Kubernetes
         run: |
-          cd devops-takehome/infrastructure
-          kubectl apply -f deployment.yaml
+          kubectl apply -f infrastructure/deployment.yaml
+          kubectl apply -f infrastructure/service.yaml
+        working-directory: devops-takehome
